@@ -4,33 +4,42 @@ using namespace cv;
 using namespace std;
 using namespace Ort;
 
-Face68Landmarks::Face68Landmarks(string model_path)
-{
-    /// OrtStatus* status = OrtSessionOptionsAppendExecutionProvider_CUDA(sessionOptions, 0);   ///如果使用cuda加速，需要取消注释
+Face68Landmarks::Face68Landmarks(string model_path) {
+#ifdef USE_CUDA_BACKEND
+    ///如果使用cuda加速，需要取消注释
+    OrtStatus *status = OrtSessionOptionsAppendExecutionProvider_CUDA(sessionOptions, 0);
+#endif
 
     sessionOptions.SetGraphOptimizationLevel(ORT_ENABLE_BASIC);
-    /// std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  ////windows写法
-    /// ort_session = new Session(env, widestr.c_str(), sessionOptions); ////windows写法
-    ort_session = new Session(env, model_path.c_str(), sessionOptions); ////linux写法
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+    std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  ////windows写法
+    ort_session = new Session(env, widestr.c_str(), sessionOptions);            ////windows写法
+#else
+    ort_session = new Session(env, model_path.c_str(), sessionOptions);    ////linux写法
+#endif
 
     size_t numInputNodes = ort_session->GetInputCount();
     size_t numOutputNodes = ort_session->GetOutputCount();
     AllocatorWithDefaultOptions allocator;
-    for (int i = 0; i < numInputNodes; i++)
-    {
-        input_names.push_back(ort_session->GetInputName(i, allocator)); /// 低版本onnxruntime的接口函数
-        ////AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);  /// 高版本onnxruntime的接口函数
-        ////input_names.push_back(input_name_Ptr.get()); /// 高版本onnxruntime的接口函数
+    for (int i = 0; i < numInputNodes; i++) {
+#ifdef USE_HIGH_ONNX_RUNTIME
+        AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);  /// 高版本onnxruntime的接口函数
+        input_names.push_back(input_name_Ptr.get());                                           /// 高版本onnxruntime的接口函数
+#else
+        input_names.push_back(ort_session->GetInputName(i, allocator));    /// 低版本onnxruntime的接口函数
+#endif
         Ort::TypeInfo input_type_info = ort_session->GetInputTypeInfo(i);
         auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
         auto input_dims = input_tensor_info.GetShape();
         input_node_dims.push_back(input_dims);
     }
-    for (int i = 0; i < numOutputNodes; i++)
-    {
-        output_names.push_back(ort_session->GetOutputName(i, allocator)); /// 低版本onnxruntime的接口函数
-        ////AllocatedStringPtr output_name_Ptr= ort_session->GetInputNameAllocated(i, allocator);
-        ////output_names.push_back(output_name_Ptr.get()); /// 高版本onnxruntime的接口函数
+    for (int i = 0; i < numOutputNodes; i++) {
+#ifdef USE_HIGH_ONNX_RUNTIME
+        AllocatedStringPtr output_name_Ptr = ort_session->GetOutputNameAllocated(i, allocator);
+        output_names.push_back(output_name_Ptr.get());  /// 高版本onnxruntime的接口函数
+#else
+        output_names.push_back(ort_session->GetOutputName(i, allocator));  /// 低版本onnxruntime的接口函数
+#endif
         Ort::TypeInfo output_type_info = ort_session->GetOutputTypeInfo(i);
         auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
         auto output_dims = output_tensor_info.GetShape();
@@ -41,8 +50,7 @@ Face68Landmarks::Face68Landmarks(string model_path)
     this->input_width = input_node_dims[0][3];
 }
 
-void Face68Landmarks::preprocess(Mat srcimg, const Bbox bounding_box)
-{
+void Face68Landmarks::preprocess(Mat srcimg, const Bbox bounding_box) {
     float sub_max = max(bounding_box.xmax - bounding_box.xmin, bounding_box.ymax - bounding_box.ymin);
     const float scale = 195.f / sub_max;
     const float translation[2] = {(256.f - (bounding_box.xmax + bounding_box.xmin) * scale) * 0.5f, (256.f - (bounding_box.ymax + bounding_box.ymin) * scale) * 0.5f};
@@ -55,8 +63,7 @@ void Face68Landmarks::preprocess(Mat srcimg, const Bbox bounding_box)
 
     vector<cv::Mat> bgrChannels(3);
     split(crop_img, bgrChannels);
-    for (int c = 0; c < 3; c++)
-    {
+    for (int c = 0; c < 3; c++) {
         bgrChannels[c].convertTo(bgrChannels[c], CV_32FC1, 1 / 255.0);
     }
 
@@ -68,8 +75,7 @@ void Face68Landmarks::preprocess(Mat srcimg, const Bbox bounding_box)
     memcpy(this->input_image.data() + image_area * 2, (float *)bgrChannels[2].data, single_chn_size);
 }
 
-vector<Point2f> Face68Landmarks::detect(Mat srcimg, const Bbox bounding_box, vector<Point2f> &face_landmark_5of68)
-{
+vector<Point2f> Face68Landmarks::detect(Mat srcimg, const Bbox bounding_box, vector<Point2f> &face_landmark_5of68) {
     this->preprocess(srcimg, bounding_box);
 
     std::vector<int64_t> input_img_shape = {1, 3, this->input_height, this->input_width};
@@ -78,11 +84,10 @@ vector<Point2f> Face68Landmarks::detect(Mat srcimg, const Bbox bounding_box, vec
     Ort::RunOptions runOptions;
     vector<Value> ort_outputs = this->ort_session->Run(runOptions, this->input_names.data(), &input_tensor_, 1, this->output_names.data(), output_names.size());
 
-    float *pdata = ort_outputs[0].GetTensorMutableData<float>(); /// 形状是(1, 68, 3), 每一行的长度是3，表示一个关键点坐标x,y和置信度
+    float *pdata = ort_outputs[0].GetTensorMutableData<float>();  /// 形状是(1, 68, 3), 每一行的长度是3，表示一个关键点坐标x,y和置信度
     const int num_points = ort_outputs[0].GetTensorTypeAndShapeInfo().GetShape()[1];
     vector<Point2f> face_landmark_68(num_points);
-    for (int i = 0; i < num_points; i++)
-    {
+    for (int i = 0; i < num_points; i++) {
         float x = pdata[i * 3] / 64.0 * 256.0;
         float y = pdata[i * 3 + 1] / 64.0 * 256.0;
         face_landmark_68[i] = Point2f(x, y);
@@ -93,28 +98,28 @@ vector<Point2f> Face68Landmarks::detect(Mat srcimg, const Bbox bounding_box, vec
     ////python程序里的convert_face_landmark_68_to_5函数////
     face_landmark_5of68.resize(5);
     float x = 0, y = 0;
-    for (int i = 36; i < 42; i++) /// left_eye
+    for (int i = 36; i < 42; i++)  /// left_eye
     {
         x += face68landmarks[i].x;
         y += face68landmarks[i].y;
     }
     x /= 6;
     y /= 6;
-    face_landmark_5of68[0] = Point2f(x, y); /// left_eye
+    face_landmark_5of68[0] = Point2f(x, y);  /// left_eye
 
     x = 0, y = 0;
-    for (int i = 42; i < 48; i++) /// right_eye
+    for (int i = 42; i < 48; i++)  /// right_eye
     {
         x += face68landmarks[i].x;
         y += face68landmarks[i].y;
     }
     x /= 6;
     y /= 6;
-    face_landmark_5of68[1] = Point2f(x, y); /// right_eye
+    face_landmark_5of68[1] = Point2f(x, y);  /// right_eye
 
-    face_landmark_5of68[2] = face68landmarks[30]; /// nose
-    face_landmark_5of68[3] = face68landmarks[48]; /// left_mouth_end
-    face_landmark_5of68[4] = face68landmarks[54]; /// right_mouth_end
+    face_landmark_5of68[2] = face68landmarks[30];  /// nose
+    face_landmark_5of68[3] = face68landmarks[48];  /// left_mouth_end
+    face_landmark_5of68[4] = face68landmarks[54];  /// right_mouth_end
     ////python程序里的convert_face_landmark_68_to_5函数////
     return face68landmarks;
 }

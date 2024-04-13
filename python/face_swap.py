@@ -8,7 +8,7 @@ INSWAPPER_128_MODEL_MEAN = [0.0, 0.0, 0.0]
 INSWAPPER_128_MODEL_STD = [1.0, 1.0, 1.0]
 
 class swap_face:
-    def __init__(self, modelpath):
+    def __init__(self, modelpath, matrixpath):
         # Initialize model
         session_option = onnxruntime.SessionOptions()
         session_option.log_severity_level = 3
@@ -19,7 +19,7 @@ class swap_face:
         self.input_shape = model_inputs[0].shape
         self.input_height = int(self.input_shape[2])
         self.input_width = int(self.input_shape[3])
-        self.model_matrix = np.load('model_matrix.npy')
+        self.model_matrix = np.load(matrixpath)
 
     def process(self, target_img, source_face_embedding, target_landmark_5):
         ###preprocess

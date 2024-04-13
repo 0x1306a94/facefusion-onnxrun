@@ -1,3 +1,5 @@
+#!/bin/env python3
+
 import cv2
 import matplotlib.pyplot as plt  ###如无则pip安装
 from yolov8face import YOLOface_8n
@@ -5,18 +7,19 @@ from face_68landmarks import face_68_landmarks
 from face_recognizer import face_recognize
 from face_swap import swap_face
 from face_enhancer import enhance_face
+import os
+import argparse;
 
-if __name__ == '__main__':
-    source_path = 'images/1.jpg'
-    target_path = 'images/5.jpg'
-    source_img = cv2.imread(source_path)
-    target_img = cv2.imread(target_path)
+
+def main(weights_dir, output_dir, source, target):
+    source_img = cv2.imread(source)
+    target_img = cv2.imread(target)
     
-    detect_face_net = YOLOface_8n("weights/yoloface_8n.onnx")
-    detect_68landmarks_net = face_68_landmarks("weights/2dfan4.onnx")
-    face_embedding_net = face_recognize('weights/arcface_w600k_r50.onnx')
-    swap_face_net = swap_face('weights/inswapper_128.onnx')
-    enhance_face_net = enhance_face('weights/gfpgan_1.4.onnx')
+    detect_face_net = YOLOface_8n(os.path.join(weights_dir , "yoloface_8n.onnx"))
+    detect_68landmarks_net = face_68_landmarks(os.path.join(weights_dir , "2dfan4.onnx"))
+    face_embedding_net = face_recognize(os.path.join(weights_dir , "arcface_w600k_r50.onnx"))
+    swap_face_net = swap_face(os.path.join(weights_dir , "inswapper_128.onnx"), "./python/model_matrix.npy")
+    enhance_face_net = enhance_face(os.path.join(weights_dir , "gfpgan_1.4.onnx"))
 
     boxes, _, _ = detect_face_net.detect(source_img)
     position = 0  ###一张图片里可能有多个人脸，这里只考虑1个人脸的情况
@@ -39,14 +42,28 @@ if __name__ == '__main__':
     plt.imshow(target_img[:,:,::-1])
     plt.axis('off')
     # plt.show()
-    plt.savefig('source_target.jpg', dpi=600, bbox_inches='tight') ###保存高清图
+    plt.savefig(os.path.join(output_dir , "source_target.jpg"), dpi=600, bbox_inches='tight') ###保存高清图
 
-    cv2.imwrite('result.jpg', resultimg)
+    cv2.imwrite(os.path.join(output_dir , "result.jpg"), resultimg)
     
     # cv2.namedWindow('resultimg', 0)
     # cv2.imshow('resultimg', resultimg)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='facefusion-onnxrun')
+    parser.add_argument('--weights_dir', type=str, default='./weights', help='模型文件目录 default ./weights')
+    parser.add_argument('--output_dir', type=str, default='./sample_out', help='输出结果目录 default ./sample_out')
+    parser.add_argument('source', type=str, help='source image')
+    parser.add_argument('target', type=str, help='target image')
+    args = parser.parse_args()
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    main(args.weights_dir, args.output_dir, args.source, args.target)
+    
 
 
 
