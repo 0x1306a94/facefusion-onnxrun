@@ -31,7 +31,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(argparse)
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED
+    COMPONENTS
+    core
+    imgcodecs
+    imgproc
+    calib3d)
+
 message(STATUS "OpenCV library status:")
 message(STATUS "    version: ${OpenCV_VERSION}")
 message(STATUS "    libraries: ${OpenCV_LIBS}")
