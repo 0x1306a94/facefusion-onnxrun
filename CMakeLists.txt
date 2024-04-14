@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(USE_HIGH_ONNX_RUNTIME "Use the high version onnxruntime" ON)
 option(USE_CUDA_BACKEND "Using cuda backend" OFF)
+option(USE_OPENCV_HIGHGUI "Using opencv highgui" OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel." FORCE)
@@ -31,12 +32,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(argparse)
 
-find_package(OpenCV REQUIRED
-    COMPONENTS
-    core
-    imgcodecs
-    imgproc
-    calib3d)
+if(USE_OPENCV_HIGHGUI)
+    find_package(OpenCV REQUIRED
+        COMPONENTS
+        core
+        imgcodecs
+        imgproc
+        calib3d
+        highgui)
+else()
+    find_package(OpenCV REQUIRED
+        COMPONENTS
+        core
+        imgcodecs
+        imgproc
+        calib3d)
+endif()
+
+
 
 message(STATUS "OpenCV library status:")
 message(STATUS "    version: ${OpenCV_VERSION}")
@@ -59,7 +72,9 @@ if(USE_CUDA_BACKEND)
     target_compile_definitions(${PROJECT_NAME} PRIVATE -DUSE_CUDA_BACKEND)
 endif()
 
-
+if(USE_OPENCV_HIGHGUI)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE -DUSE_OPENCV_HIGHGUI)
+endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ./cpp 
@@ -71,6 +86,17 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     argparse
     onnxruntime::onnxruntime
 )
+
+if(APPLE)
+  set_target_properties(${PROJECT_NAME} PROPERTIES
+    MACOSX_BUNDLE FALSE
+    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+    XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+    XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual"
+  )
+elseif(UNIX)
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
+endif()
 
 # add_custom_command(TARGET ${PROJECT_NAME}
 #     POST_BUILD

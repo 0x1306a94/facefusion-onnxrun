@@ -1,7 +1,6 @@
 #ifndef YOLOV8FACE
 #define YOLOV8FACE
 #include <fstream>
-#include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <sstream>
 
