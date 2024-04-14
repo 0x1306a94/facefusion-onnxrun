@@ -27,7 +27,9 @@ class Face68Landmarks {
     Ort::Env env = Ort::Env(ORT_LOGGING_LEVEL_ERROR, "68FaceLandMarks Detect");
     Ort::Session *ort_session = nullptr;
     Ort::SessionOptions sessionOptions = Ort::SessionOptions();
+    std::vector<Ort::AllocatedStringPtr> input_names_ptrs;
     std::vector<char *> input_names;
+    std::vector<Ort::AllocatedStringPtr> output_names_ptrs;
     std::vector<char *> output_names;
     std::vector<std::vector<int64_t>> input_node_dims;   // >=1 outputs
     std::vector<std::vector<int64_t>> output_node_dims;  // >=1 outputs

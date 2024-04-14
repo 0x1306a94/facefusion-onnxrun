@@ -20,14 +20,21 @@ FaceEmbdding::FaceEmbdding(string model_path) {
 
     size_t numInputNodes = ort_session->GetInputCount();
     size_t numOutputNodes = ort_session->GetOutputCount();
+
+    input_names_ptrs.reserve(numInputNodes);
+    input_names.reserve(numInputNodes);
+
+    output_names_ptrs.reserve(numOutputNodes);
+    output_names.reserve(numOutputNodes);
+
     AllocatorWithDefaultOptions allocator;
     for (int i = 0; i < numInputNodes; i++) {
 #ifdef USE_HIGH_ONNX_RUNTIME
-        /// 高版本onnxruntime的接口函数
         AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);
+        std::cerr << "FaceEmbdding input name: " << input_name_Ptr.get() << std::endl;
         input_names.push_back(input_name_Ptr.get());
+        input_names_ptrs.push_back(std::move(input_name_Ptr));
 #else
-        /// 低版本onnxruntime的接口函数
         input_names.push_back(ort_session->GetInputName(i, allocator));
 #endif
 
@@ -38,11 +45,12 @@ FaceEmbdding::FaceEmbdding(string model_path) {
     }
     for (int i = 0; i < numOutputNodes; i++) {
 #ifdef USE_HIGH_ONNX_RUNTIME
-        /// 高版本onnxruntime的接口函数
         AllocatedStringPtr output_name_Ptr = ort_session->GetOutputNameAllocated(i, allocator);
+        std::cerr << "FaceEmbdding output name: " << output_name_Ptr.get() << std::endl;
         output_names.push_back(output_name_Ptr.get());
+        output_names_ptrs.push_back(std::move(output_name_Ptr));
 #else
-        output_names.push_back(ort_session->GetOutputName(i, allocator));  /// 低版本onnxruntime的接口函数
+        output_names.push_back(ort_session->GetOutputName(i, allocator));
 #endif
 
         Ort::TypeInfo output_type_info = ort_session->GetOutputTypeInfo(i);
