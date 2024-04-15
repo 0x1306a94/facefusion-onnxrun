@@ -99,13 +99,13 @@ int main(int argc, char *argv[]) {
     string out_dir = program.get<std::string>("--out");
     string source_path = program.get<std::string>("--source");
     string target_path = program.get<std::string>("--target");
+  
+    if (!fs::exists(out_dir)) {
+        fs::create_directories(out_dir);
+    }
 
     if (fs::path(out_dir).is_relative()) {
         out_dir = fs::canonical(out_dir).string();
-    }
-
-    if (!fs::exists(out_dir)) {
-        fs::create_directories(out_dir);
     }
 
     if (fs::path(weights_dir).is_relative()) {
