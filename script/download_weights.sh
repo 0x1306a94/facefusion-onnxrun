@@ -3,7 +3,7 @@
 set -e
 
 DOWNLOAD_BASE_URL="https://github.com/0x1306a94/facefusion-onnxrun/releases/download/weights_model_v1"
-PROJECT_DIR=$(realpath $(dirname $0))
+PROJECT_DIR=$(realpath $(dirname $0)/..)
 SAVE_DIR=$PROJECT_DIR/weights
 
 if [ ! -d "$SAVE_DIR" ]; then
